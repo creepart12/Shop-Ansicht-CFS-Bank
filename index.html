@@ -1,113 +1,294 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="de">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CFS-Bank Admin Panel</title>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <style>
-    body { font-family: Arial, sans-serif; background-color: #f0f4f8; margin: 0; padding: 0; }
-    header { background-color: #004aad; color: white; padding: 1rem; text-align: center; }
-    main { padding: 1rem; max-width: 1200px; margin: auto; }
-    table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
-    th, td { padding: 0.75rem; border: 1px solid #ccc; text-align: left; }
-    th { background-color: #0074e4; color: white; }
-    button { padding: 0.4rem 0.8rem; margin: 0.2rem; cursor: pointer; border: none; border-radius: 4px; }
-    .approve { background-color: #28a745; color: white; }
-    .reject { background-color: #dc3545; color: white; }
-  </style>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>CFS-Bank — Shop Terminal</title>
+<style>
+  :root{
+    --bg:#f4f6f8; --card:#ffffff;
+    --brand:#0f3a63; --accent:#1466a6;
+    --muted:#6b7280; --danger:#b00020; --ok:#0b8a2e;
+    --pending:#c084fc;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,Arial;background:var(--bg);color:#111}
+  header{background:linear-gradient(90deg,var(--brand),var(--accent));color:#fff;padding:14px 18px}
+  header h1{margin:0;font-size:18px}
+  .wrap{max-width:1100px;margin:28px auto;padding:16px}
+  .grid{display:grid;grid-template-columns:1fr;gap:18px}
+  @media(min-width:920px){ .grid{grid-template-columns:560px 1fr} }
+  .card{background:var(--card);border-radius:12px;padding:18px;box-shadow:0 10px 30px rgba(10,20,40,0.06)}
+  label{display:block;color:var(--muted);font-size:13px;margin-top:10px}
+  input{width:100%;padding:10px 12px;margin-top:8px;border:1px solid #e6e9ee;border-radius:8px;font-size:15px}
+  .row{display:flex;gap:10px;align-items:center}
+  button{background:var(--brand);color:#fff;border:none;padding:10px 14px;border-radius:9px;cursor:pointer;font-weight:600}
+  .ghost{background:#f3f5f7;color:#333;border:1px solid #e6e9ee}
+  .small{font-size:13px;color:var(--muted)}
+  .error{color:var(--danger);margin-top:10px}
+  .success{color:var(--ok);margin-top:10px}
+  ul{padding-left:18px;margin-top:8px}
+  li{margin-bottom:8px}
+  .tx-date{color:#666;font-size:12px;margin-right:8px}
+  .status-pill{display:inline-block;padding:4px 8px;border-radius:999px;font-size:12px}
+  .status-pending{background:var(--pending);color:#3b0250}
+  .status-approved{background:#d1fae5;color:#064e3b}
+  .status-rejected{background:#fee2e2;color:#7f1d1d}
+  .header-row{display:flex;align-items:center;justify-content:space-between}
+  .logout{background:#444;padding:8px 12px;border-radius:8px;color:#fff;border:none;cursor:pointer}
+</style>
 </head>
 <body>
-
 <header>
-  <h1>CFS-Bank Admin Panel</h1>
+  <div style="max-width:1100px;margin:0 auto;display:flex;align-items:center;justify-content:space-between">
+    <h1>CFS-Bank — Shop Terminal</h1>
+  </div>
 </header>
 
-<main>
-  <h2>Transaktionen verwalten</h2>
-  <table id="transactionsTable">
-    <thead>
-      <tr>
-        <th>ID</th>
-        <th>Erstellt am</th>
-        <th>Konto</th>
-        <th>Shopname</th>
-        <th>Betrag</th>
-        <th>Status</th>
-        <th>Aktionen</th>
-      </tr>
-    </thead>
-    <tbody></tbody>
-  </table>
+<main class="wrap">
+  <div class="grid">
+    <!-- Left: Login / Terminal -->
+    <section class="card" id="leftCard">
+      <!-- Login -->
+      <div id="loginBlock">
+        <h2 style="margin:0 0 8px 0">Shop-Login</h2>
+        <div class="small">Melde dich mit Shopname, Passwort und Secret Code an.</div>
+
+        <label for="shopName">Shopname</label>
+        <input id="shopName" type="text" placeholder="z. B. Schulshop" autocomplete="off" />
+
+        <label for="shopPassword">Passwort</label>
+        <input id="shopPassword" type="password" placeholder="Passwort" />
+
+        <label for="shopSecret">Secret Code</label>
+        <input id="shopSecret" type="text" placeholder="z. B. ABC123" />
+
+        <div style="display:flex;gap:10px;margin-top:12px">
+          <button id="shopLoginBtn">Einloggen</button>
+          <button id="shopClearBtn" class="ghost">Eingaben löschen</button>
+        </div>
+
+        <div id="shopLoginMessage" class="error" style="display:none"></div>
+      </div>
+
+      <!-- Terminal -->
+      <div id="terminalBlock" style="display:none">
+        <div class="header-row" style="align-items:flex-start">
+          <div>
+            <h2 id="terminalTitle" style="margin:0">Terminal</h2>
+            <div class="small" id="terminalShopInfo">—</div>
+          </div>
+          <div>
+            <button id="shopLogoutBtn" class="logout">Abmelden</button>
+          </div>
+        </div>
+
+        <hr style="margin:12px 0">
+
+        <label for="custKonto">Kundennummer</label>
+        <input id="custKonto" type="text" inputmode="numeric" placeholder="Kontonummer des Kunden" />
+
+        <label for="amount">Betrag (ganzzahlig)</label>
+        <input id="amount" type="number" min="1" step="1" placeholder="z. B. 5" />
+
+        <label for="desc">Beschreibung (optional)</label>
+        <input id="desc" type="text" placeholder="z. B. Mensa Snack" />
+
+        <div style="display:flex;gap:10px;margin-top:12px">
+          <button id="requestBtn">Anfrage senden (pending)</button>
+        </div>
+
+        <div id="terminalMsg" style="margin-top:12px"></div>
+      </div>
+    </section>
+
+    <!-- Right: Transactions list -->
+    <aside class="card">
+      <div class="header-row">
+        <h3 style="margin:0">Letzte Transaktionen (dein Shop)</h3>
+        <div class="small" id="lastFetch">—</div>
+      </div>
+
+      <div id="txContainer" style="margin-top:10px">
+        <div class="small">Bitte Shop einloggen, um Transaktionen zu sehen.</div>
+      </div>
+    </aside>
+  </div>
+
+  <div style="margin-top:14px" class="small">
+    Hinweis: Standard-Workflow: Shop sendet **Anfrage** (pending). Die CFS-Bank prüft und bestätigt.
+  </div>
 </main>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js/dist/umd/supabase.min.js"></script>
 <script>
-  // Supabase einrichten
-  const supabaseUrl = 'https://urgciggvwrzyzwscmxlq.supabase.co';
-  const supabaseKey = 'SERVICE_ROLE_KEY_HIER_EINFÜGEN'; // Service Role Key verwenden für Admin
-  const supabase = supabase.createClient(supabaseUrl, supabaseKey);
+const SUPABASE_URL = "https://urgciggvwrzyzwscmxlq.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVyZ2NpZ2d2d3J6eXp3c2NteGxxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMwODgzNTIsImV4cCI6MjA4ODY2NDM1Mn0.WWHigzYPZvg9SSV49YEhv3gSU7rXUoL80gWxzmCL098";
 
-  async function loadTransactions() {
-    const { data, error } = await supabase
+const supabaseClient = window.supabaseClient || (typeof supabase !== 'undefined' ? supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null);
+if (!window.supabaseClient && supabaseClient) window.supabaseClient = supabaseClient;
+if (!supabaseClient) { document.body.innerHTML = '<div style="padding:20px"><h2>Fehler</h2><p>Supabase SDK nicht geladen.</p></div>'; throw new Error('Supabase SDK not found'); }
+
+const shopNameEl = document.getElementById('shopName');
+const shopPassEl = document.getElementById('shopPassword');
+const shopSecretEl = document.getElementById('shopSecret');
+const shopLoginBtn = document.getElementById('shopLoginBtn');
+const shopClearBtn = document.getElementById('shopClearBtn');
+const shopLoginMessage = document.getElementById('shopLoginMessage');
+
+const loginBlock = document.getElementById('loginBlock');
+const terminalBlock = document.getElementById('terminalBlock');
+const terminalTitle = document.getElementById('terminalTitle');
+const terminalShopInfo = document.getElementById('terminalShopInfo');
+
+const shopLogoutBtn = document.getElementById('shopLogoutBtn');
+const custKontoEl = document.getElementById('custKonto');
+const amountEl = document.getElementById('amount');
+const descEl = document.getElementById('desc');
+const requestBtn = document.getElementById('requestBtn');
+const terminalMsg = document.getElementById('terminalMsg');
+
+const txContainer = document.getElementById('txContainer');
+const lastFetch = document.getElementById('lastFetch');
+
+let currentShop = null;
+
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function showShopLoginMessage(msg, error=true){ shopLoginMessage.style.display='block'; shopLoginMessage.textContent=msg; shopLoginMessage.className = error ? 'error' : 'success'; }
+function clearShopLoginMessage(){ shopLoginMessage.style.display='none'; shopLoginMessage.textContent=''; }
+function setTerminalMsg(msg, error=false){ terminalMsg.textContent = msg; terminalMsg.className = error ? 'error' : 'success'; }
+function clearTerminalMsg(){ terminalMsg.textContent = ''; terminalMsg.className = ''; }
+
+async function shopLogin(){
+  clearShopLoginMessage();
+  const sName = shopNameEl.value.trim();
+  const sPass = shopPassEl.value.trim();
+  const sSecret = shopSecretEl.value.trim();
+
+  if(!sName){ showShopLoginMessage('Bitte Shopname eingeben.'); shopNameEl.focus(); return; }
+  if(!sPass){ showShopLoginMessage('Bitte Passwort eingeben.'); shopPassEl.focus(); return; }
+  if(!sSecret){ showShopLoginMessage('Bitte Secret Code eingeben.'); shopSecretEl.focus(); return; }
+
+  shopLoginBtn.disabled = true;
+  try{
+    const { data, error } = await supabaseClient
+      .from('shops')
+      .select('id, Shopname, password, secretcode')
+      .eq('Shopname', sName)
+      .maybeSingle();
+
+    if(error){ console.error('supabase shop lookup error', error); showShopLoginMessage('Datenbankfehler.', true); shopLoginBtn.disabled=false; return; }
+    if(!data){ showShopLoginMessage('Shop nicht gefunden.', true); shopLoginBtn.disabled=false; return; }
+
+    if(String(data.password) !== sPass || String(data.secretcode) !== sSecret){
+      showShopLoginMessage('Zugangsdaten falsch.', true); shopLoginBtn.disabled=false; return;
+    }
+
+    currentShop = { id: data.id, Shopname: data.Shopname };
+    loginBlock.style.display='none';
+    terminalBlock.style.display='block';
+    terminalTitle.textContent = `Terminal — ${currentShop.Shopname}`;
+    terminalShopInfo.textContent = `Angemeldet als ${currentShop.Shopname}`;
+    clearShopLoginMessage();
+    fetchRecentTransactions();
+  }catch(e){
+    console.error('shopLogin exception', e);
+    showShopLoginMessage('Unerwarteter Fehler.', true);
+  }finally{
+    shopLoginBtn.disabled=false;
+    shopPassEl.value=''; shopSecretEl.value='';
+  }
+}
+
+function shopLogout(){
+  currentShop = null;
+  loginBlock.style.display='block';
+  terminalBlock.style.display='none';
+  txContainer.innerHTML = '<div class="small">Bitte Shop einloggen, um Transaktionen zu sehen.</div>';
+  shopNameEl.value=''; shopPassEl.value=''; shopSecretEl.value='';
+  clearTerminalMsg();
+}
+
+async function fetchRecentTransactions(){
+  if(!currentShop) return;
+  txContainer.innerHTML = '<div class="small">Lade…</div>';
+  lastFetch.textContent = 'Lade…';
+  try{
+    const { data, error } = await supabaseClient
       .from('transactions')
-      .select('id, created_At, Konto, Shopname, Amount, status')
-      .order('created_At', { ascending: false });
+      .select('id, Konto, Shopname, Amount, status, created_at')
+      .eq('Shopname', currentShop.Shopname)
+      .order('created_at', { ascending:false })
+      .limit(100);
 
-    if (error) {
-      console.error('Load transactions error:', error);
-      alert('Fehler beim Laden der Transaktionen!');
+    if(error){ console.error('fetchRecentTransactions error', error); txContainer.innerHTML = '<div class="error">Fehler beim Laden.</div>'; lastFetch.textContent='-'; return; }
+
+    if(!data || data.length === 0){
+      txContainer.innerHTML = '<div class="small">Noch keine Transaktionen für diesen Shop.</div>';
+      lastFetch.textContent = new Date().toLocaleTimeString();
       return;
     }
 
-    const tbody = document.querySelector('#transactionsTable tbody');
-    tbody.innerHTML = '';
-
-    data.forEach(tx => {
-      const row = document.createElement('tr');
-
-      row.innerHTML = `
-        <td>${tx.id}</td>
-        <td>${new Date(tx.created_At).toLocaleString()}</td>
-        <td>${tx.Konto}</td>
-        <td>${tx.Shopname}</td>
-        <td>${tx.Amount}</td>
-        <td>${tx.status}</td>
-        <td>
-          ${tx.status === 'Pending' ? `<button class="approve">Approve</button><button class="reject">Reject</button>` : ''}
-        </td>
-      `;
-
-      // Approve / Reject Button Event Listener
-      if (tx.status === 'Pending') {
-        row.querySelector('.approve').addEventListener('click', () => handleStatusChange(tx.id, 'Approved'));
-        row.querySelector('.reject').addEventListener('click', () => handleStatusChange(tx.id, 'Rejected'));
-      }
-
-      tbody.appendChild(row);
-    });
-  }
-
-  async function handleStatusChange(id, newStatus) {
-    const confirmMsg = `Bist du sicher, dass du diese Transaktion auf "${newStatus}" setzen willst?`;
-    if (!confirm(confirmMsg)) return;
-
-    const { data, error } = await supabase
-      .from('transactions')
-      .update({ status: newStatus })
-      .eq('id', id);
-
-    if (error) {
-      console.error('Status update error:', error);
-      alert('Fehler beim Aktualisieren des Status!');
-    } else {
-      alert(`Transaktion erfolgreich auf "${newStatus}" gesetzt!`);
-      loadTransactions(); // Tabelle neu laden
+    let html = '<ul>';
+    for(const t of data){
+      const date = t.created_at ? new Date(t.created_at).toLocaleString() : '';
+      const status = String(t.status ?? 'pending').toLowerCase();
+      let pill = '<span class="status-pill status-pending">pending</span>';
+      if(status === 'approved') pill = '<span class="status-pill status-approved">approved</span>';
+      if(status === 'rejected') pill = '<span class="status-pill status-rejected">rejected</span>';
+      html += `<li><span class="tx-date">${escapeHtml(date)}</span> ${escapeHtml(t.Shopname)} — <strong>${escapeHtml(String(t.Amount))} €</strong> ${pill} <div class="small">Konto: ${escapeHtml(String(t.Konto))}</div></li>`;
     }
+    html += '</ul>';
+    txContainer.innerHTML = html;
+    lastFetch.textContent = new Date().toLocaleTimeString();
+  }catch(e){
+    console.error('fetchRecentTransactions exception', e);
+    txContainer.innerHTML = '<div class="error">Unerwarteter Fehler.</div>';
+    lastFetch.textContent = '-';
   }
+}
 
-  // Lade die Transaktionen beim Start
-  loadTransactions();
+async function sendRequest(){
+  clearTerminalMsg();
+  if(!currentShop){ setTerminalMsg('Bitte einloggen.', true); return; }
+
+  const kontoRaw = custKontoEl.value.trim();
+  const amountRaw = amountEl.value;
+
+  if(!kontoRaw){ setTerminalMsg('Bitte Kundennummer eingeben.', true); custKontoEl.focus(); return; }
+  const kontoNum = Number.parseInt(kontoRaw,10);
+  if(Number.isNaN(kontoNum)){ setTerminalMsg('Kundennummer ungültig.', true); custKontoEl.focus(); return; }
+  const amount = Number.parseInt(amountRaw,10);
+  if(Number.isNaN(amount) || amount <= 0){ setTerminalMsg('Bitte einen gültigen Betrag eingeben.', true); amountEl.focus(); return; }
+
+  setTerminalMsg('Anfrage wird gesendet…');
+
+  try{
+    const { error } = await supabaseClient
+      .from('transactions')
+      .insert([{ Konto: kontoNum, Shopname: currentShop.Shopname, Amount: amount, status: 'pending' }]);
+
+    if(error){ console.error('insert request error', error); setTerminalMsg('Fehler beim Senden der Anfrage (RLS?).', true); return; }
+
+    setTerminalMsg('Anfrage gesendet (pending).', false);
+    fetchRecentTransactions();
+    custKontoEl.value=''; amountEl.value='';
+  }catch(e){
+    console.error('sendRequest exception', e);
+    setTerminalMsg('Unerwarteter Fehler beim Senden.', true);
+  }
+}
+
+shopLoginBtn.addEventListener('click', shopLogin);
+shopClearBtn.addEventListener('click', ()=>{ shopNameEl.value=''; shopPassEl.value=''; shopSecretEl.value=''; clearShopLoginMessage(); shopNameEl.focus(); });
+shopLogoutBtn.addEventListener('click', shopLogout);
+requestBtn.addEventListener('click', sendRequest);
+
+custKontoEl.addEventListener('keydown', (e)=>{ if(e.key==='Enter') amountEl.focus(); });
+amountEl.addEventListener('keydown', (e)=>{ if(e.key==='Enter') requestBtn.click(); });
+
+shopNameEl.focus();
+setInterval(()=>{ if(currentShop) fetchRecentTransactions(); }, 12_000);
 </script>
-
 </body>
 </html>
