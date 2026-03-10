@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CFS-Bank Admin Panel</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    body { font-family: Arial, sans-serif; background-color: #f0f4f8; margin: 0; padding: 0; }
+    header { background-color: #004aad; color: white; padding: 1rem; text-align: center; }
+    main { padding: 1rem; max-width: 1200px; margin: auto; }
+    table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+    th, td { padding: 0.75rem; border: 1px solid #ccc; text-align: left; }
+    th { background-color: #0074e4; color: white; }
+    button { padding: 0.4rem 0.8rem; margin: 0.2rem; cursor: pointer; border: none; border-radius: 4px; }
+    .approve { background-color: #28a745; color: white; }
+    .reject { background-color: #dc3545; color: white; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>CFS-Bank Admin Panel</h1>
+</header>
+
+<main>
+  <h2>Transaktionen verwalten</h2>
+  <table id="transactionsTable">
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Erstellt am</th>
+        <th>Konto</th>
+        <th>Shopname</th>
+        <th>Betrag</th>
+        <th>Status</th>
+        <th>Aktionen</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+</main>
+
+<script>
+  // Supabase einrichten
+  const supabaseUrl = 'https://urgciggvwrzyzwscmxlq.supabase.co';
+  const supabaseKey = 'SERVICE_ROLE_KEY_HIER_EINFÜGEN'; // Service Role Key verwenden für Admin
+  const supabase = supabase.createClient(supabaseUrl, supabaseKey);
+
+  async function loadTransactions() {
+    const { data, error } = await supabase
+      .from('transactions')
+      .select('id, created_At, Konto, Shopname, Amount, status')
+      .order('created_At', { ascending: false });
+
+    if (error) {
+      console.error('Load transactions error:', error);
+      alert('Fehler beim Laden der Transaktionen!');
+      return;
+    }
+
+    const tbody = document.querySelector('#transactionsTable tbody');
+    tbody.innerHTML = '';
+
+    data.forEach(tx => {
+      const row = document.createElement('tr');
+
+      row.innerHTML = `
+        <td>${tx.id}</td>
+        <td>${new Date(tx.created_At).toLocaleString()}</td>
+        <td>${tx.Konto}</td>
+        <td>${tx.Shopname}</td>
+        <td>${tx.Amount}</td>
+        <td>${tx.status}</td>
+        <td>
+          ${tx.status === 'Pending' ? `<button class="approve">Approve</button><button class="reject">Reject</button>` : ''}
+        </td>
+      `;
+
+      // Approve / Reject Button Event Listener
+      if (tx.status === 'Pending') {
+        row.querySelector('.approve').addEventListener('click', () => handleStatusChange(tx.id, 'Approved'));
+        row.querySelector('.reject').addEventListener('click', () => handleStatusChange(tx.id, 'Rejected'));
+      }
+
+      tbody.appendChild(row);
+    });
+  }
+
+  async function handleStatusChange(id, newStatus) {
+    const confirmMsg = `Bist du sicher, dass du diese Transaktion auf "${newStatus}" setzen willst?`;
+    if (!confirm(confirmMsg)) return;
+
+    const { data, error } = await supabase
+      .from('transactions')
+      .update({ status: newStatus })
+      .eq('id', id);
+
+    if (error) {
+      console.error('Status update error:', error);
+      alert('Fehler beim Aktualisieren des Status!');
+    } else {
+      alert(`Transaktion erfolgreich auf "${newStatus}" gesetzt!`);
+      loadTransactions(); // Tabelle neu laden
+    }
+  }
+
+  // Lade die Transaktionen beim Start
+  loadTransactions();
+</script>
+
+</body>
+</html>
